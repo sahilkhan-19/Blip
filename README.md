@@ -1,5 +1,7 @@
 # Blip
 
+[![Live Demo](https://img.shields.io/badge/Live-Demo-success?style=for-the-badge)](https://bliper.vercel.app)
+
 A real-time anonymous group chat platform. No sign-up, no email, no tracking. Users pick a username, create or join a room, and start chatting instantly. Rooms are ephemeral — they exist only while at least one person is in them.
 
 ---
