@@ -20,6 +20,7 @@
       --text-muted: #666;
       --text-dim: #999;
       --danger: #ff4f4f;
+      --success: #47ff8a;
       --mono: 'IBM Plex Mono', monospace;
       --sans: 'IBM Plex Sans', sans-serif;
       --radius: 4px;
@@ -142,7 +143,6 @@
       top: 20px;
       left: 50%;
       transform: translateX(-50%) translateY(-60px);
-      background: var(--danger);
       color: #fff;
       padding: 10px 20px;
       border-radius: var(--radius);
@@ -153,9 +153,11 @@
       white-space: nowrap;
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.error { background: var(--danger); }
+    #toast.success { background: #1a3a28; border: 1px solid var(--success); color: var(--success); }
 
     /* ── ROOM LIST ── */
-    .room-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    .room-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
     .room-list::-webkit-scrollbar { width: 4px; }
     .room-list::-webkit-scrollbar-track { background: transparent; }
     .room-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -183,6 +185,14 @@
       font-family: var(--mono);
       font-size: 11px;
       color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lock-icon {
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0;
     }
     .room-dot {
       width: 6px; height: 6px;
@@ -211,6 +221,91 @@
       text-transform: uppercase;
     }
 
+    /* ── PIN DISPLAY (creator sees this after room created) ── */
+    .pin-banner {
+      background: #1a1f00;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .pin-banner-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+    .pin-banner-desc {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+    .pin-digits {
+      display: flex;
+      gap: 8px;
+    }
+    .pin-digit {
+      width: 48px;
+      height: 56px;
+      background: var(--bg);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0;
+    }
+    .pin-copy-btn {
+      align-self: flex-start;
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 6px 12px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pin-copy-btn:hover { background: var(--accent); color: #0e0e0e; }
+
+    /* ── PIN ENTRY (joiner sees this) ── */
+    .pin-entry {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+    .pin-input-cell {
+      width: 52px;
+      height: 60px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 22px;
+      font-weight: 600;
+      text-align: center;
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.15s;
+      caret-color: transparent;
+    }
+    .pin-input-cell:focus { border-color: var(--accent); }
+    .pin-input-cell.filled { border-color: var(--accent); color: var(--accent); }
+
     /* ── CHAT SCREEN ── */
     #chat-screen {
       display: none;
@@ -234,6 +329,8 @@
     .chat-room-title { font-family: var(--mono); font-size: 14px; font-weight: 600; }
     .chat-room-meta { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 1px; }
 
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
     .invite-btn {
       font-family: var(--mono);
       font-size: 10px;
@@ -248,6 +345,41 @@
       transition: all 0.15s;
     }
     .invite-btn:hover { background: var(--accent); color: #0e0e0e; }
+
+    .pin-reveal-btn {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+    .pin-reveal-btn:hover { border-color: var(--text-dim); color: var(--text); }
+
+    /* PIN tooltip/popover in chat header */
+    .pin-popover {
+      position: absolute;
+      top: 60px;
+      right: 20px;
+      background: #1a1f00;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+      animation: fadeIn 0.2s ease;
+    }
+    .pin-popover.open { display: flex; }
+    .pin-popover-label { font-family: var(--mono); font-size: 9px; letter-spacing: 3px; color: var(--accent); text-transform: uppercase; }
+    .pin-popover-digits { font-family: var(--mono); font-size: 26px; font-weight: 600; color: var(--accent); letter-spacing: 10px; }
+    .pin-popover-hint { font-family: var(--mono); font-size: 10px; color: var(--text-muted); }
 
     .chat-body {
       flex: 1;
@@ -311,15 +443,10 @@
       color: var(--text-muted);
     }
 
-    /* Group messages from same sender */
     .msg + .msg.theirs:not(.system),
-    .msg + .msg.mine:not(.system) {
-      margin-top: 2px;
-    }
+    .msg + .msg.mine:not(.system) { margin-top: 2px; }
     .msg.system + .msg,
-    .msg + .msg.system {
-      margin-top: 10px;
-    }
+    .msg + .msg.system { margin-top: 10px; }
 
     .typing-indicator {
       font-family: var(--mono);
@@ -339,10 +466,7 @@
       align-items: center;
       flex-shrink: 0;
     }
-    .chat-footer input {
-      flex: 1;
-      border-radius: 2px;
-    }
+    .chat-footer input { flex: 1; border-radius: 2px; }
     .send-btn {
       background: var(--accent);
       color: #0e0e0e;
@@ -356,17 +480,14 @@
     }
     .send-btn:hover { background: var(--accent-dim); }
 
-    /* ── ONLINE COUNT BADGE ── */
-    .online-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
+    .online-badge { display: inline-flex; align-items: center; gap: 5px; }
+
+    /* relative wrapper for chat header (for popover positioning) */
+    .chat-header { position: relative; }
   </style>
 </head>
 <body>
 
-<!-- TOAST -->
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════
@@ -377,12 +498,10 @@
     <div class="logo">Blip</div>
     <div class="tagline">// no signup. no tracking. just talk.</div>
   </div>
-
   <div>
     <label for="username-input">Your username</label>
     <input id="username-input" type="text" placeholder="e.g. ghost_42" maxlength="30" autocomplete="off" />
   </div>
-
   <button class="btn btn-primary" onclick="submitUsername()">Continue →</button>
 </div>
 
@@ -394,7 +513,6 @@
     <div class="logo">Blip</div>
     <div class="tagline" id="welcome-tag"></div>
   </div>
-
   <div class="btn-row">
     <button class="btn btn-primary" onclick="showScreen('create-screen')">+ Create Room</button>
     <button class="btn btn-secondary" onclick="showJoinScreen()">Join Room</button>
@@ -409,16 +527,38 @@
     <div class="logo">Create Room</div>
     <div class="tagline">// give your room a name</div>
   </div>
-
   <div>
     <label for="room-title-input">Room title</label>
     <input id="room-title-input" type="text" placeholder="e.g. Late Night Thoughts" maxlength="100" autocomplete="off" />
   </div>
-
   <div class="btn-row">
     <button class="btn btn-secondary" onclick="showScreen('action-screen')">← Back</button>
     <button class="btn btn-primary" onclick="createRoom()">Create →</button>
   </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN 3b: ROOM CREATED — Show PIN
+═══════════════════════════════ -->
+<div class="screen" id="created-screen">
+  <div>
+    <div class="logo">Room Created</div>
+    <div class="tagline">// share this PIN with friends</div>
+  </div>
+
+  <div class="pin-banner">
+    <div class="pin-banner-label">🔒 Room PIN</div>
+    <div class="pin-digits" id="created-pin-digits">
+      <div class="pin-digit">-</div>
+      <div class="pin-digit">-</div>
+      <div class="pin-digit">-</div>
+      <div class="pin-digit">-</div>
+    </div>
+    <div class="pin-banner-desc">Anyone joining your room will need to enter this PIN.<br/>Share it only with people you want inside.</div>
+    <button class="pin-copy-btn" onclick="copyPin()">⎘ Copy PIN</button>
+  </div>
+
+  <button class="btn btn-primary" onclick="enterChatFromCreated()">Enter Room →</button>
 </div>
 
 <!-- ═══════════════════════════════
@@ -444,6 +584,17 @@
     </div>
   </div>
 
+  <!-- PIN Entry — shown after a room is selected -->
+  <div id="pin-entry-section" style="display:none;">
+    <label>Enter room PIN</label>
+    <div class="pin-entry">
+      <input class="pin-input-cell" type="text" inputmode="numeric" maxlength="1" id="pin0" oninput="pinInput(0)" onkeydown="pinKeydown(event,0)" />
+      <input class="pin-input-cell" type="text" inputmode="numeric" maxlength="1" id="pin1" oninput="pinInput(1)" onkeydown="pinKeydown(event,1)" />
+      <input class="pin-input-cell" type="text" inputmode="numeric" maxlength="1" id="pin2" oninput="pinInput(2)" onkeydown="pinKeydown(event,2)" />
+      <input class="pin-input-cell" type="text" inputmode="numeric" maxlength="1" id="pin3" oninput="pinInput(3)" onkeydown="pinKeydown(event,3)" />
+    </div>
+  </div>
+
   <div class="btn-row">
     <button class="btn btn-secondary" onclick="showScreen('action-screen')">← Back</button>
     <button class="btn btn-primary" id="join-btn" onclick="joinRoom()" disabled>Join →</button>
@@ -464,14 +615,22 @@
         <span style="margin-left:8px" id="my-username-tag"></span>
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div class="header-actions">
+      <!-- Only visible to room creator -->
+      <button class="pin-reveal-btn" id="pin-reveal-btn" onclick="togglePinPopover()" style="display:none;">🔒 PIN</button>
       <button class="invite-btn" onclick="copyInvite()">⎘ Invite</button>
       <button class="btn btn-ghost" onclick="leaveRoom()">Leave</button>
+    </div>
+
+    <!-- PIN popover for creator -->
+    <div class="pin-popover" id="pin-popover">
+      <div class="pin-popover-label">Room PIN</div>
+      <div class="pin-popover-digits" id="popover-pin-digits"></div>
+      <div class="pin-popover-hint">Share with friends to let them join.</div>
     </div>
   </div>
 
   <div class="chat-body" id="chat-body"></div>
-
   <div class="typing-indicator" id="typing-indicator"></div>
 
   <div class="chat-footer">
@@ -482,68 +641,64 @@
 </div>
 
 <script>
-  // ══════════════════════════════════
-  // CONFIG — change this to your server
-  // ══════════════════════════════════
-  const SERVER_URL = 'https://blip-qh96.onrender.com'; // assumes frontend served from same origin
+  const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:3000'
+  : 'https://blip-qh96.onrender.com';
 
-  // ══════════════════════════════════
-  // STATE
-  // ══════════════════════════════════
+  // ── STATE ──
   let socket = null;
   let myUsername = '';
   let currentRoomId = null;
   let currentRoomTitle = '';
+  let currentPin = null;       // only set for creator
+  let isCreator = false;
   let selectedRoomId = null;
   let typingTimer = null;
   let isTyping = false;
   let typingUsers = new Set();
   let onlineUsers = [];
 
-  // ══════════════════════════════════
-  // SCREEN MANAGEMENT
-  // ══════════════════════════════════
+  // ── SCREEN ──
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById(id).classList.add('active');
   }
 
-  // ══════════════════════════════════
-  // TOAST
-  // ══════════════════════════════════
-  function showToast(msg) {
+  // ── TOAST ──
+  let toastTimer = null;
+  function showToast(msg, type = 'error') {
     const t = document.getElementById('toast');
     t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3000);
+    t.className = `show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
   }
 
-  // ══════════════════════════════════
-  // SOCKET INIT
-  // ══════════════════════════════════
+  // ── SOCKET INIT ──
   function initSocket() {
     if (socket) return;
     socket = io(SERVER_URL);
 
-    socket.on('connect', () => {
-      socket.emit('get-rooms');
-    });
-
-    socket.on('error', (msg) => showToast(msg));
-
+    socket.on('connect', () => socket.emit('get-rooms'));
+    socket.on('error', (msg) => showToast(msg, 'error'));
     socket.on('rooms-list', renderRoomList);
     socket.on('rooms-updated', renderRoomList);
 
-    socket.on('room-created', ({ roomId, title, users }) => {
+    socket.on('room-created', ({ roomId, title, pin, users }) => {
       currentRoomId = roomId;
       currentRoomTitle = title;
+      currentPin = pin;
+      isCreator = true;
       onlineUsers = users;
-      enterChatScreen();
+      // Show the PIN screen before entering chat
+      showCreatedScreen(pin, title);
     });
 
     socket.on('joined-room', ({ roomId, title, users }) => {
       currentRoomId = roomId;
       currentRoomTitle = title;
+      currentPin = null;
+      isCreator = false;
       onlineUsers = users;
       enterChatScreen();
     });
@@ -583,9 +738,7 @@
     });
   }
 
-  // ══════════════════════════════════
-  // STEP 1: USERNAME
-  // ══════════════════════════════════
+  // ── STEP 1: USERNAME ──
   function submitUsername() {
     const val = document.getElementById('username-input').value.trim();
     if (!val) { showToast('Enter a username first'); return; }
@@ -600,9 +753,7 @@
     if (e.key === 'Enter') submitUsername();
   });
 
-  // ══════════════════════════════════
-  // CREATE ROOM
-  // ══════════════════════════════════
+  // ── CREATE ROOM ──
   function createRoom() {
     const title = document.getElementById('room-title-input').value.trim();
     if (!title) { showToast('Enter a room title'); return; }
@@ -613,38 +764,116 @@
     if (e.key === 'Enter') createRoom();
   });
 
-  // ══════════════════════════════════
-  // JOIN ROOM
-  // ══════════════════════════════════
+  // ── SHOW PIN AFTER CREATION ──
+  function showCreatedScreen(pin, title) {
+    const digits = document.getElementById('created-pin-digits');
+    digits.innerHTML = pin.split('').map(d =>
+      `<div class="pin-digit">${d}</div>`
+    ).join('');
+    showScreen('created-screen');
+  }
+
+  function copyPin() {
+    if (!currentPin) return;
+    navigator.clipboard.writeText(currentPin).then(() => showToast('PIN copied!', 'success'));
+  }
+
+  function enterChatFromCreated() {
+    enterChatScreen();
+  }
+
+  // ── JOIN ROOM ──
   function showJoinScreen() {
     selectedRoomId = null;
     document.getElementById('join-id-input').value = '';
     document.getElementById('join-btn').disabled = true;
+    document.getElementById('pin-entry-section').style.display = 'none';
+    clearPinInputs();
     socket.emit('get-rooms');
     showScreen('join-screen');
   }
 
-  // Enable join button when ID field has text
   document.getElementById('join-id-input').addEventListener('input', function () {
     selectedRoomId = this.value.trim() || null;
-    document.getElementById('join-btn').disabled = !selectedRoomId;
-    // deselect card if typing manually
     document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
+    if (selectedRoomId) {
+      showPinEntry();
+    } else {
+      hidePinEntry();
+    }
+    updateJoinBtn();
   });
 
   document.getElementById('join-id-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') joinRoom();
   });
 
+  function showPinEntry() {
+    const section = document.getElementById('pin-entry-section');
+    section.style.display = 'block';
+    clearPinInputs();
+    document.getElementById('pin0').focus();
+  }
+
+  function hidePinEntry() {
+    document.getElementById('pin-entry-section').style.display = 'none';
+    clearPinInputs();
+  }
+
+  function clearPinInputs() {
+    for (let i = 0; i < 4; i++) {
+      const el = document.getElementById(`pin${i}`);
+      el.value = '';
+      el.classList.remove('filled');
+    }
+  }
+
+  function getPinValue() {
+    return [0,1,2,3].map(i => document.getElementById(`pin${i}`).value).join('');
+  }
+
+  function updateJoinBtn() {
+    const hasRoom = !!(selectedRoomId || document.getElementById('join-id-input').value.trim());
+    const pinVisible = document.getElementById('pin-entry-section').style.display !== 'none';
+    const pin = getPinValue();
+    document.getElementById('join-btn').disabled = !(hasRoom && (!pinVisible || pin.length === 4));
+  }
+
+  // PIN cell behavior
+  function pinInput(idx) {
+    const el = document.getElementById(`pin${idx}`);
+    // Only allow digits
+    el.value = el.value.replace(/\D/g, '').slice(-1);
+    el.classList.toggle('filled', el.value !== '');
+    if (el.value && idx < 3) {
+      document.getElementById(`pin${idx + 1}`).focus();
+    }
+    updateJoinBtn();
+  }
+
+  function pinKeydown(e, idx) {
+    if (e.key === 'Backspace') {
+      const el = document.getElementById(`pin${idx}`);
+      if (!el.value && idx > 0) {
+        const prev = document.getElementById(`pin${idx - 1}`);
+        prev.value = '';
+        prev.classList.remove('filled');
+        prev.focus();
+        updateJoinBtn();
+      }
+    }
+    if (e.key === 'Enter') joinRoom();
+  }
+
   function joinRoom() {
     const roomId = selectedRoomId || document.getElementById('join-id-input').value.trim();
     if (!roomId) { showToast('Select a room or paste a room ID'); return; }
-    socket.emit('join-room', { roomId, username: myUsername });
+    const pin = getPinValue();
+    if (!pin || pin.length < 4) { showToast('Enter the 4-digit PIN to join'); return; }
+    socket.emit('join-room', { roomId, username: myUsername, pin });
   }
 
-  // ══════════════════════════════════
-  // ROOM LIST RENDERING
-  // ══════════════════════════════════
+  // ── ROOM LIST RENDERING ──
   function renderRoomList(rooms) {
     const el = document.getElementById('room-list');
     if (!rooms || rooms.length === 0) {
@@ -654,7 +883,10 @@
     el.innerHTML = rooms.map(r => `
       <div class="room-card" onclick="selectRoom('${r.roomId}', this)">
         <div class="room-card-title">${escHtml(r.title)}</div>
-        <div class="room-card-meta">${r.userCount} online</div>
+        <div class="room-card-meta">
+          <span class="lock-icon">🔒</span>
+          ${r.userCount} online
+        </div>
       </div>
     `).join('');
   }
@@ -664,21 +896,46 @@
     document.getElementById('join-id-input').value = roomId;
     document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
     el.classList.add('selected');
-    document.getElementById('join-btn').disabled = false;
+    showPinEntry();
+    updateJoinBtn();
   }
 
-  // ══════════════════════════════════
-  // CHAT SCREEN
-  // ══════════════════════════════════
+  // ── CHAT SCREEN ──
   function enterChatScreen() {
     document.getElementById('chat-title').textContent = currentRoomTitle;
     document.getElementById('chat-body').innerHTML = '';
     typingUsers.clear();
     updateTypingIndicator();
+
+    // Show PIN button in header only for creator
+    const pinBtn = document.getElementById('pin-reveal-btn');
+    if (isCreator && currentPin) {
+      pinBtn.style.display = 'inline-block';
+      document.getElementById('popover-pin-digits').textContent = currentPin;
+    } else {
+      pinBtn.style.display = 'none';
+    }
+
+    // Close popover if open
+    document.getElementById('pin-popover').classList.remove('open');
+
     showScreen('chat-screen');
     document.getElementById('msg-input').focus();
     updateOnlineCount();
   }
+
+  function togglePinPopover() {
+    document.getElementById('pin-popover').classList.toggle('open');
+  }
+
+  // Close popover when clicking outside
+  document.addEventListener('click', (e) => {
+    const popover = document.getElementById('pin-popover');
+    const btn = document.getElementById('pin-reveal-btn');
+    if (!popover.contains(e.target) && e.target !== btn) {
+      popover.classList.remove('open');
+    }
+  });
 
   function updateOnlineCount() {
     const count = onlineUsers.length;
@@ -714,9 +971,7 @@
     body.scrollTop = body.scrollHeight;
   }
 
-  // ══════════════════════════════════
-  // SEND MESSAGE
-  // ══════════════════════════════════
+  // ── SEND MESSAGE ──
   function sendMessage() {
     const input = document.getElementById('msg-input');
     const text = input.value.trim();
@@ -733,9 +988,7 @@
     }
   }
 
-  // ══════════════════════════════════
-  // TYPING INDICATOR
-  // ══════════════════════════════════
+  // ── TYPING ──
   function handleTyping() {
     if (!isTyping) {
       isTyping = true;
@@ -761,26 +1014,24 @@
     el.textContent = `${others.slice(0, -1).join(', ')} and ${others.at(-1)} are typing…`;
   }
 
-  // ══════════════════════════════════
-  // INVITE / LEAVE
-  // ══════════════════════════════════
+  // ── INVITE / LEAVE ──
   function copyInvite() {
     const url = `${window.location.origin}?room=${currentRoomId}`;
-    navigator.clipboard.writeText(url).then(() => showToast('Invite link copied!'));
+    navigator.clipboard.writeText(url).then(() => showToast('Invite link copied!', 'success'));
   }
 
   function leaveRoom() {
     socket.emit('leave-room');
     currentRoomId = null;
     currentRoomTitle = '';
+    currentPin = null;
+    isCreator = false;
     onlineUsers = [];
     typingUsers.clear();
     showScreen('action-screen');
   }
 
-  // ══════════════════════════════════
-  // HELPERS
-  // ══════════════════════════════════
+  // ── HELPERS ──
   function escHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -789,25 +1040,20 @@
       .replace(/"/g, '&quot;');
   }
 
-  // ══════════════════════════════════
-  // AUTO-JOIN FROM URL (?room=xxx)
-  // ══════════════════════════════════
-  // If someone opens an invite link, pre-fill the username screen notice.
-  // Actual join happens after username is submitted.
+  // ── AUTO-JOIN FROM URL (?room=xxx) ──
   const urlParams = new URLSearchParams(window.location.search);
   const inviteRoomId = urlParams.get('room');
   if (inviteRoomId) {
     document.querySelector('.tagline').textContent = '// you have been invited to a room';
-    // After username is submitted, skip to join with pre-filled room ID
     const _orig = submitUsername;
     window.submitUsername = function () {
       _orig();
-      // override: go straight to join screen with the room pre-selected
       setTimeout(() => {
         showScreen('join-screen');
         document.getElementById('join-id-input').value = inviteRoomId;
         selectedRoomId = inviteRoomId;
-        document.getElementById('join-btn').disabled = false;
+        showPinEntry();
+        updateJoinBtn();
       }, 50);
     };
   }

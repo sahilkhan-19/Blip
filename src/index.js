@@ -20,7 +20,7 @@ const io = new Server(server, {
   },
 });
 
-// rooms[roomId] = { title, createdAt, users: [{ socketId, username }], messages: [] }
+// rooms[roomId] = { title, createdAt, pin, users: [{ socketId, username }], messages: [] }
 const rooms = {};
 
 // users[socketId] = { roomId, username }
@@ -36,6 +36,15 @@ const MAX_USERNAME_LENGTH = 30;
 const MAX_TITLE_LENGTH = 100;
 
 // =====================
+// HELPERS
+// =====================
+
+function generatePin() {
+  // 4-digit numeric PIN: 1000–9999
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+// =====================
 // REST ENDPOINTS
 // =====================
 
@@ -43,7 +52,7 @@ app.get("/", (req, res) => {
   res.send("Backend running");
 });
 
-// Get all active rooms (for initial page load before socket connects)
+// Get all active rooms — note: PIN is intentionally excluded from this list
 app.get("/rooms", (req, res) => {
   const roomList = Object.entries(rooms).map(([id, room]) => ({
     roomId: id,
@@ -65,7 +74,7 @@ io.on("connection", (socket) => {
   // GET ROOMS
   // Payload: none
   // Emits back: "rooms-list" → [{ roomId, title, userCount, createdAt }]
-  // Use: call this right after connecting to populate the room list
+  // PIN is never sent in room listings for security
   // -------------------------------------------------------
   socket.on("get-rooms", () => {
     const roomList = Object.entries(rooms).map(([id, room]) => ({
@@ -81,7 +90,7 @@ io.on("connection", (socket) => {
   // GET ROOM INFO
   // Payload: { roomId }
   // Emits back: "room-info" → { roomId, title, userCount, users: [username] }
-  // Use: show room details before joining
+  // PIN is not included here either
   // -------------------------------------------------------
   socket.on("get-room-info", (data) => {
     const room = rooms[data?.roomId];
@@ -100,11 +109,11 @@ io.on("connection", (socket) => {
   // -------------------------------------------------------
   // CREATE ROOM
   // Payload: { username, title }
-  // Emits back to creator: "room-created" → { roomId, title }
-  // Broadcasts to all: "rooms-updated" → updated room list
+  // Emits back to creator: "room-created" → { roomId, title, pin, users }
+  //   ↑ PIN is only sent to the creator, never broadcast
+  // Broadcasts to all: "rooms-updated" → updated room list (no PIN)
   // -------------------------------------------------------
   socket.on("create-room", (data) => {
-    // Guard: already in a room
     if (users[socket.id]) {
       socket.emit("error", "You are already in a room");
       return;
@@ -123,9 +132,11 @@ io.on("connection", (socket) => {
     }
 
     const roomId = crypto.randomUUID();
+    const pin = generatePin();
 
     rooms[roomId] = {
       title,
+      pin,
       createdAt: new Date().toISOString(),
       users: [{ socketId: socket.id, username }],
       messages: [],
@@ -134,24 +145,26 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     users[socket.id] = { roomId, username };
 
-    socket.emit("room-created", { roomId, title, users: [username] });
+    // Send PIN only to the creator
+    socket.emit("room-created", { roomId, title, pin, users: [username] });
 
-    // Broadcast updated room list to everyone not in a room
     broadcastRoomList();
 
-    console.log(`[ROOM CREATED] "${title}" (${roomId}) by "${username}"`);
+    console.log(
+      `[ROOM CREATED] "${title}" (${roomId}) by "${username}" | PIN: ${pin}`,
+    );
   });
 
   // -------------------------------------------------------
   // JOIN ROOM
-  // Payload: { roomId, username }
+  // Payload: { roomId, username, pin }
+  // Validates PIN before allowing entry.
   // Emits back to joiner:
-  //   "joined-room"   → { roomId, title, username }
+  //   "joined-room"   → { roomId, title, username, users }
   //   "chat-history"  → [message]
-  // Broadcasts to room: "user-joined" → { username, users: [username] }
+  // Broadcasts to room: "user-joined" → { username, users }
   // -------------------------------------------------------
   socket.on("join-room", (data) => {
-    // Guard: already in a room
     if (users[socket.id]) {
       socket.emit("error", "You are already in a room");
       return;
@@ -159,6 +172,7 @@ io.on("connection", (socket) => {
 
     const username = data?.username?.trim().slice(0, MAX_USERNAME_LENGTH);
     const roomId = data?.roomId;
+    const pin = data?.pin?.trim();
 
     if (!username) {
       socket.emit("error", "Username is required");
@@ -168,6 +182,16 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room) {
       socket.emit("error", "Room not found");
+      return;
+    }
+
+    // PIN validation
+    if (!pin) {
+      socket.emit("error", "PIN is required to join this room");
+      return;
+    }
+    if (pin !== room.pin) {
+      socket.emit("error", "Incorrect PIN. Ask the room creator for the PIN.");
       return;
     }
 
@@ -186,13 +210,16 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     users[socket.id] = { roomId, username };
 
-    // Send history only to the new joiner
     const userList = room.users.map((u) => u.username);
-    socket.emit("joined-room", { roomId, title: room.title, username, users: userList });
+    socket.emit("joined-room", {
+      roomId,
+      title: room.title,
+      username,
+      users: userList,
+    });
     socket.emit("chat-history", room.messages);
     socket.to(roomId).emit("user-joined", { username, users: userList });
 
-    // Broadcast updated room list (user count changed)
     broadcastRoomList();
 
     console.log(`[JOIN] "${username}" joined room "${room.title}" (${roomId})`);
@@ -200,8 +227,6 @@ io.on("connection", (socket) => {
 
   // -------------------------------------------------------
   // SEND MESSAGE
-  // Payload: { text }
-  // Broadcasts to room: "new-message" → { id, text, sender, timestamp }
   // -------------------------------------------------------
   socket.on("send-message", (data) => {
     const user = users[socket.id];
@@ -213,7 +238,10 @@ io.on("connection", (socket) => {
     const text = data?.text?.trim();
     if (!text) return;
     if (text.length > MAX_MESSAGE_LENGTH) {
-      socket.emit("error", `Message too long (max ${MAX_MESSAGE_LENGTH} chars)`);
+      socket.emit(
+        "error",
+        `Message too long (max ${MAX_MESSAGE_LENGTH} chars)`,
+      );
       return;
     }
 
@@ -224,7 +252,6 @@ io.on("connection", (socket) => {
       timestamp: new Date().toISOString(),
     };
 
-    // Cap history to MAX_MESSAGES
     if (room.messages.length >= MAX_MESSAGES) {
       room.messages.shift();
     }
@@ -234,9 +261,7 @@ io.on("connection", (socket) => {
   });
 
   // -------------------------------------------------------
-  // TYPING START
-  // Payload: none
-  // Broadcasts to room (except sender): "user-typing" → { username }
+  // TYPING START / STOP
   // -------------------------------------------------------
   socket.on("typing-start", () => {
     const user = users[socket.id];
@@ -244,11 +269,6 @@ io.on("connection", (socket) => {
     socket.to(user.roomId).emit("user-typing", { username: user.username });
   });
 
-  // -------------------------------------------------------
-  // TYPING STOP
-  // Payload: none
-  // Broadcasts to room (except sender): "stop-typing" → { username }
-  // -------------------------------------------------------
   socket.on("typing-stop", () => {
     const user = users[socket.id];
     if (!user) return;
@@ -256,17 +276,12 @@ io.on("connection", (socket) => {
   });
 
   // -------------------------------------------------------
-  // LEAVE ROOM
-  // Payload: none
-  // Allows user to leave without disconnecting (e.g. go back to room list)
+  // LEAVE ROOM / DISCONNECT
   // -------------------------------------------------------
   socket.on("leave-room", () => {
     handleLeave(socket);
   });
 
-  // -------------------------------------------------------
-  // DISCONNECT
-  // -------------------------------------------------------
   socket.on("disconnect", () => {
     handleLeave(socket);
     console.log(`[-] Disconnected: ${socket.id}`);
@@ -299,7 +314,6 @@ function handleLeave(socket) {
   socket.leave(roomId);
   delete users[socket.id];
 
-  // Broadcast updated room list (room removed or user count changed)
   broadcastRoomList();
 }
 
@@ -309,6 +323,7 @@ function broadcastRoomList() {
     title: room.title,
     userCount: room.users.length,
     createdAt: room.createdAt,
+    // PIN intentionally excluded
   }));
   io.emit("rooms-updated", roomList);
 }
