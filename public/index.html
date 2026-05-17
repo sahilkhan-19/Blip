@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blip</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0e0e0e;
+      --surface: #171717;
+      --border: #2a2a2a;
+      --accent: #e8ff47;
+      --accent-dim: #b8cc2a;
+      --text: #f0f0f0;
+      --text-muted: #666;
+      --text-dim: #999;
+      --danger: #ff4f4f;
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'IBM Plex Sans', sans-serif;
+      --radius: 4px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── SCREENS ── */
+    .screen { display: none; width: 100%; max-width: 480px; padding: 24px; }
+    .screen.active { display: flex; flex-direction: column; gap: 20px; }
+    #chat-screen { max-width: 700px; height: 100vh; padding: 0; }
+
+    /* ── HEADER ── */
+    .logo {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 4px;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .tagline {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    /* ── FORM ELEMENTS ── */
+    label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 14px;
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--text-muted); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 12px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0e0e0e;
+    }
+    .btn-primary:hover { background: var(--accent-dim); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--text-dim); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      font-size: 11px;
+      padding: 8px 0;
+    }
+    .btn-ghost:hover { color: var(--text); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-row { display: flex; gap: 10px; }
+    .btn-row .btn { flex: 1; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── ERROR TOAST ── */
+    #toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-60px);
+      background: var(--danger);
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+      transition: transform 0.25s ease;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── ROOM LIST ── */
+    .room-list { display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+    .room-list::-webkit-scrollbar { width: 4px; }
+    .room-list::-webkit-scrollbar-track { background: transparent; }
+    .room-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .room-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .room-card:hover { border-color: var(--accent); background: #1e1e1e; }
+    .room-card.selected { border-color: var(--accent); background: #1e1e1e; }
+
+    .room-card-title {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .room-card-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .room-dot {
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .empty-rooms {
+      text-align: center;
+      padding: 30px;
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+    }
+
+    /* ── SECTION TITLE ── */
+    .section-title {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    /* ── CHAT SCREEN ── */
+    #chat-screen {
+      display: none;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+      max-width: 700px;
+    }
+    #chat-screen.active { display: flex; }
+
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      flex-shrink: 0;
+    }
+    .chat-header-left { display: flex; flex-direction: column; gap: 2px; }
+    .chat-room-title { font-family: var(--mono); font-size: 14px; font-weight: 600; }
+    .chat-room-meta { font-family: var(--mono); font-size: 10px; color: var(--text-muted); letter-spacing: 1px; }
+
+    .invite-btn {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 6px 12px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.15s;
+    }
+    .invite-btn:hover { background: var(--accent); color: #0e0e0e; }
+
+    .chat-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .chat-body::-webkit-scrollbar { width: 4px; }
+    .chat-body::-webkit-scrollbar-track { background: transparent; }
+    .chat-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg {
+      display: flex;
+      flex-direction: column;
+      max-width: 75%;
+      gap: 3px;
+    }
+    .msg.mine { align-self: flex-end; align-items: flex-end; }
+    .msg.theirs { align-self: flex-start; align-items: flex-start; }
+    .msg.system { align-self: center; align-items: center; max-width: 100%; }
+
+    .msg-sender {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 3px;
+      font-size: 14px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .msg.mine .msg-bubble {
+      background: var(--accent);
+      color: #0e0e0e;
+      font-weight: 500;
+    }
+    .msg.theirs .msg-bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .msg.system .msg-bubble {
+      background: transparent;
+      border: none;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      padding: 4px 0;
+    }
+
+    .msg-time {
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    /* Group messages from same sender */
+    .msg + .msg.theirs:not(.system),
+    .msg + .msg.mine:not(.system) {
+      margin-top: 2px;
+    }
+    .msg.system + .msg,
+    .msg + .msg.system {
+      margin-top: 10px;
+    }
+
+    .typing-indicator {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 4px 20px;
+      min-height: 22px;
+      flex-shrink: 0;
+    }
+
+    .chat-footer {
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .chat-footer input {
+      flex: 1;
+      border-radius: 2px;
+    }
+    .send-btn {
+      background: var(--accent);
+      color: #0e0e0e;
+      border: none;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.15s;
+      line-height: 1;
+    }
+    .send-btn:hover { background: var(--accent-dim); }
+
+    /* ── ONLINE COUNT BADGE ── */
+    .online-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ═══════════════════════════════
+     SCREEN 1: USERNAME
+═══════════════════════════════ -->
+<div class="screen active" id="username-screen">
+  <div>
+    <div class="logo">Blip</div>
+    <div class="tagline">// no signup. no tracking. just talk.</div>
+  </div>
+
+  <div>
+    <label for="username-input">Your username</label>
+    <input id="username-input" type="text" placeholder="e.g. ghost_42" maxlength="30" autocomplete="off" />
+  </div>
+
+  <button class="btn btn-primary" onclick="submitUsername()">Continue →</button>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN 2: CHOOSE ACTION
+═══════════════════════════════ -->
+<div class="screen" id="action-screen">
+  <div>
+    <div class="logo">Blip</div>
+    <div class="tagline" id="welcome-tag"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="showScreen('create-screen')">+ Create Room</button>
+    <button class="btn btn-secondary" onclick="showJoinScreen()">Join Room</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN 3: CREATE ROOM
+═══════════════════════════════ -->
+<div class="screen" id="create-screen">
+  <div>
+    <div class="logo">Create Room</div>
+    <div class="tagline">// give your room a name</div>
+  </div>
+
+  <div>
+    <label for="room-title-input">Room title</label>
+    <input id="room-title-input" type="text" placeholder="e.g. Late Night Thoughts" maxlength="100" autocomplete="off" />
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="showScreen('action-screen')">← Back</button>
+    <button class="btn btn-primary" onclick="createRoom()">Create →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN 4: JOIN ROOM
+═══════════════════════════════ -->
+<div class="screen" id="join-screen">
+  <div>
+    <div class="logo">Join Room</div>
+    <div class="tagline">// pick a room or paste an invite link</div>
+  </div>
+
+  <div>
+    <label>Paste room ID</label>
+    <input id="join-id-input" type="text" placeholder="room-id-here" autocomplete="off" />
+  </div>
+
+  <div class="divider">or pick below</div>
+
+  <div>
+    <div class="section-title" style="margin-bottom:10px">Active rooms</div>
+    <div class="room-list" id="room-list">
+      <div class="empty-rooms">No active rooms yet.<br/>Be the first to create one.</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="showScreen('action-screen')">← Back</button>
+    <button class="btn btn-primary" id="join-btn" onclick="joinRoom()" disabled>Join →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════
+     SCREEN 5: CHAT
+═══════════════════════════════ -->
+<div class="screen" id="chat-screen">
+  <div class="chat-header">
+    <div class="chat-header-left">
+      <div class="chat-room-title" id="chat-title">Room</div>
+      <div class="chat-room-meta online-badge">
+        <span class="room-dot"></span>
+        <span id="online-count">1 online</span>
+        <span style="margin-left:8px; color: var(--text-muted)">·</span>
+        <span style="margin-left:8px" id="my-username-tag"></span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="invite-btn" onclick="copyInvite()">⎘ Invite</button>
+      <button class="btn btn-ghost" onclick="leaveRoom()">Leave</button>
+    </div>
+  </div>
+
+  <div class="chat-body" id="chat-body"></div>
+
+  <div class="typing-indicator" id="typing-indicator"></div>
+
+  <div class="chat-footer">
+    <input id="msg-input" type="text" placeholder="Type a message…" maxlength="2000"
+      onkeydown="handleMsgKey(event)" oninput="handleTyping()" autocomplete="off" />
+    <button class="send-btn" onclick="sendMessage()">↑</button>
+  </div>
+</div>
+
+<script>
+  // ══════════════════════════════════
+  // CONFIG — change this to your server
+  // ══════════════════════════════════
+  const SERVER_URL = window.location.origin; // assumes frontend served from same origin
+
+  // ══════════════════════════════════
+  // STATE
+  // ══════════════════════════════════
+  let socket = null;
+  let myUsername = '';
+  let currentRoomId = null;
+  let currentRoomTitle = '';
+  let selectedRoomId = null;
+  let typingTimer = null;
+  let isTyping = false;
+  let typingUsers = new Set();
+  let onlineUsers = [];
+
+  // ══════════════════════════════════
+  // SCREEN MANAGEMENT
+  // ══════════════════════════════════
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ══════════════════════════════════
+  // TOAST
+  // ══════════════════════════════════
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ══════════════════════════════════
+  // SOCKET INIT
+  // ══════════════════════════════════
+  function initSocket() {
+    if (socket) return;
+    socket = io(SERVER_URL);
+
+    socket.on('connect', () => {
+      socket.emit('get-rooms');
+    });
+
+    socket.on('error', (msg) => showToast(msg));
+
+    socket.on('rooms-list', renderRoomList);
+    socket.on('rooms-updated', renderRoomList);
+
+    socket.on('room-created', ({ roomId, title, users }) => {
+      currentRoomId = roomId;
+      currentRoomTitle = title;
+      onlineUsers = users;
+      enterChatScreen();
+    });
+
+    socket.on('joined-room', ({ roomId, title, users }) => {
+      currentRoomId = roomId;
+      currentRoomTitle = title;
+      onlineUsers = users;
+      enterChatScreen();
+    });
+
+    socket.on('chat-history', (messages) => {
+      messages.forEach(addMessage);
+      scrollToBottom();
+    });
+
+    socket.on('new-message', (msg) => {
+      addMessage(msg);
+      scrollToBottom();
+    });
+
+    socket.on('user-joined', ({ username, users }) => {
+      onlineUsers = users;
+      updateOnlineCount();
+      addSystemMsg(`${username} joined`);
+    });
+
+    socket.on('user-left', ({ username, users }) => {
+      onlineUsers = users;
+      updateOnlineCount();
+      typingUsers.delete(username);
+      updateTypingIndicator();
+      addSystemMsg(`${username} left`);
+    });
+
+    socket.on('user-typing', ({ username }) => {
+      typingUsers.add(username);
+      updateTypingIndicator();
+    });
+
+    socket.on('stop-typing', ({ username }) => {
+      typingUsers.delete(username);
+      updateTypingIndicator();
+    });
+  }
+
+  // ══════════════════════════════════
+  // STEP 1: USERNAME
+  // ══════════════════════════════════
+  function submitUsername() {
+    const val = document.getElementById('username-input').value.trim();
+    if (!val) { showToast('Enter a username first'); return; }
+    myUsername = val;
+    document.getElementById('welcome-tag').textContent = `// hey, ${myUsername}`;
+    document.getElementById('my-username-tag').textContent = myUsername;
+    initSocket();
+    showScreen('action-screen');
+  }
+
+  document.getElementById('username-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitUsername();
+  });
+
+  // ══════════════════════════════════
+  // CREATE ROOM
+  // ══════════════════════════════════
+  function createRoom() {
+    const title = document.getElementById('room-title-input').value.trim();
+    if (!title) { showToast('Enter a room title'); return; }
+    socket.emit('create-room', { username: myUsername, title });
+  }
+
+  document.getElementById('room-title-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') createRoom();
+  });
+
+  // ══════════════════════════════════
+  // JOIN ROOM
+  // ══════════════════════════════════
+  function showJoinScreen() {
+    selectedRoomId = null;
+    document.getElementById('join-id-input').value = '';
+    document.getElementById('join-btn').disabled = true;
+    socket.emit('get-rooms');
+    showScreen('join-screen');
+  }
+
+  // Enable join button when ID field has text
+  document.getElementById('join-id-input').addEventListener('input', function () {
+    selectedRoomId = this.value.trim() || null;
+    document.getElementById('join-btn').disabled = !selectedRoomId;
+    // deselect card if typing manually
+    document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
+  });
+
+  document.getElementById('join-id-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') joinRoom();
+  });
+
+  function joinRoom() {
+    const roomId = selectedRoomId || document.getElementById('join-id-input').value.trim();
+    if (!roomId) { showToast('Select a room or paste a room ID'); return; }
+    socket.emit('join-room', { roomId, username: myUsername });
+  }
+
+  // ══════════════════════════════════
+  // ROOM LIST RENDERING
+  // ══════════════════════════════════
+  function renderRoomList(rooms) {
+    const el = document.getElementById('room-list');
+    if (!rooms || rooms.length === 0) {
+      el.innerHTML = `<div class="empty-rooms">No active rooms yet.<br/>Be the first to create one.</div>`;
+      return;
+    }
+    el.innerHTML = rooms.map(r => `
+      <div class="room-card" onclick="selectRoom('${r.roomId}', this)">
+        <div class="room-card-title">${escHtml(r.title)}</div>
+        <div class="room-card-meta">${r.userCount} online</div>
+      </div>
+    `).join('');
+  }
+
+  function selectRoom(roomId, el) {
+    selectedRoomId = roomId;
+    document.getElementById('join-id-input').value = roomId;
+    document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('join-btn').disabled = false;
+  }
+
+  // ══════════════════════════════════
+  // CHAT SCREEN
+  // ══════════════════════════════════
+  function enterChatScreen() {
+    document.getElementById('chat-title').textContent = currentRoomTitle;
+    document.getElementById('chat-body').innerHTML = '';
+    typingUsers.clear();
+    updateTypingIndicator();
+    showScreen('chat-screen');
+    document.getElementById('msg-input').focus();
+    updateOnlineCount();
+  }
+
+  function updateOnlineCount() {
+    const count = onlineUsers.length;
+    document.getElementById('online-count').textContent = `${count} online`;
+  }
+
+  function addMessage(msg) {
+    const body = document.getElementById('chat-body');
+    const isMine = msg.sender === myUsername;
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const div = document.createElement('div');
+    div.className = `msg ${isMine ? 'mine' : 'theirs'}`;
+    div.innerHTML = `
+      ${!isMine ? `<div class="msg-sender">${escHtml(msg.sender)}</div>` : ''}
+      <div class="msg-bubble">${escHtml(msg.text)}</div>
+      <div class="msg-time">${time}</div>
+    `;
+    body.appendChild(div);
+  }
+
+  function addSystemMsg(text) {
+    const body = document.getElementById('chat-body');
+    const div = document.createElement('div');
+    div.className = 'msg system';
+    div.innerHTML = `<div class="msg-bubble">${escHtml(text)}</div>`;
+    body.appendChild(div);
+    scrollToBottom();
+  }
+
+  function scrollToBottom() {
+    const body = document.getElementById('chat-body');
+    body.scrollTop = body.scrollHeight;
+  }
+
+  // ══════════════════════════════════
+  // SEND MESSAGE
+  // ══════════════════════════════════
+  function sendMessage() {
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text) return;
+    socket.emit('send-message', { text });
+    input.value = '';
+    stopTyping();
+  }
+
+  function handleMsgKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ══════════════════════════════════
+  // TYPING INDICATOR
+  // ══════════════════════════════════
+  function handleTyping() {
+    if (!isTyping) {
+      isTyping = true;
+      socket.emit('typing-start');
+    }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(stopTyping, 2000);
+  }
+
+  function stopTyping() {
+    if (isTyping) {
+      isTyping = false;
+      socket.emit('typing-stop');
+    }
+    clearTimeout(typingTimer);
+  }
+
+  function updateTypingIndicator() {
+    const el = document.getElementById('typing-indicator');
+    const others = [...typingUsers].filter(u => u !== myUsername);
+    if (others.length === 0) { el.textContent = ''; return; }
+    if (others.length === 1) { el.textContent = `${others[0]} is typing…`; return; }
+    el.textContent = `${others.slice(0, -1).join(', ')} and ${others.at(-1)} are typing…`;
+  }
+
+  // ══════════════════════════════════
+  // INVITE / LEAVE
+  // ══════════════════════════════════
+  function copyInvite() {
+    const url = `${window.location.origin}?room=${currentRoomId}`;
+    navigator.clipboard.writeText(url).then(() => showToast('Invite link copied!'));
+  }
+
+  function leaveRoom() {
+    socket.emit('leave-room');
+    currentRoomId = null;
+    currentRoomTitle = '';
+    onlineUsers = [];
+    typingUsers.clear();
+    showScreen('action-screen');
+  }
+
+  // ══════════════════════════════════
+  // HELPERS
+  // ══════════════════════════════════
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ══════════════════════════════════
+  // AUTO-JOIN FROM URL (?room=xxx)
+  // ══════════════════════════════════
+  // If someone opens an invite link, pre-fill the username screen notice.
+  // Actual join happens after username is submitted.
+  const urlParams = new URLSearchParams(window.location.search);
+  const inviteRoomId = urlParams.get('room');
+  if (inviteRoomId) {
+    document.querySelector('.tagline').textContent = '// you have been invited to a room';
+    // After username is submitted, skip to join with pre-filled room ID
+    const _orig = submitUsername;
+    window.submitUsername = function () {
+      _orig();
+      // override: go straight to join screen with the room pre-selected
+      setTimeout(() => {
+        showScreen('join-screen');
+        document.getElementById('join-id-input').value = inviteRoomId;
+        selectedRoomId = inviteRoomId;
+        document.getElementById('join-btn').disabled = false;
+      }, 50);
+    };
+  }
+</script>
+</body>
+</html>
