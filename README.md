@@ -88,7 +88,7 @@ The frontend is served as a static file from Express. There is no build step, no
 │  Express                                            │
 │  ├── GET /          → health check                  │
 │  ├── GET /rooms     → room list (REST fallback)     │
-│  └── static /public → serves index.html            │
+│  └── static /public → serves index.html             │
 │                                                     │
 │  Socket.IO Server                                   │
 │  ├── Manages socket connections                     │
